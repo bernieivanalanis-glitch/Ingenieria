@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador y Calculadora de Circuitos Magnéticos — Ingeniería Electromagnética</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fuentes de Ingeniería: Inter y JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            navy: {
+              850: '#10243e',
+              900: '#0a192f',
+              950: '#06101f',
+            },
+            tech: {
+              blue: '#0284c7',
+              cyan: '#06b6d4',
+              amber: '#d97706',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Estilos base y variables de diseño */
+    :root {
+      --blueprint-grid: rgba(14, 165, 233, 0.08);
+      --blueprint-line: #0369a1;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    /* Fondo tipo plano CAD para el diagrama técnico */
+    .cad-canvas {
+      background-color: #f8fafc;
+      background-image: 
+        linear-gradient(to right, rgba(2, 132, 199, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(2, 132, 199, 0.08) 1px, transparent 1px),
+        linear-gradient(to right, rgba(2, 132, 199, 0.16) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(2, 132, 199, 0.16) 1px, transparent 1px);
+      background-size: 16px 16px, 16px 16px, 80px 80px, 80px 80px;
+    }
+
+    /* Estilo de hoja universitaria para memoria de cálculo */
+    .math-block {
+      border-left: 4px solid #0284c7;
+      background: #ffffff;
+      transition: all 0.2s ease;
+    }
+    .math-block:hover {
+      border-left-color: #d97706;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    }
+
+    /* Ocultar flechas en inputs numéricos si se desea un aspecto más limpio */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      opacity: 1;
+    }
+
+    /* Estilos específicos para exportación formal a PDF / Impresión */
+    @media print {
+      @page {
+        size: letter portrait;
+        margin: 1.2cm;
+      }
+
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-size: 10pt;
+      }
+
+      /* Ocultar controles interactivos, botones y navegación */
+      .no-print {
+        display: none !important;
+      }
+
+      /* Mostrar elementos exclusivos de reporte impreso */
+      .print-only {
+        display: block !important;
+      }
+
+      /* Asegurar que todo el layout sea de 1 columna limpia para papel */
+      .print-container {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      .print-card {
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+        break-inside: avoid;
+        margin-bottom: 14px !important;
+      }
+
+      /* Forzar la visualización de TODOS los incisos en impresión aunque haya un filtro activo */
+      .inciso-card {
+        display: block !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        border: 1px solid #cbd5e1 !important;
+        margin-bottom: 10px !important;
+      }
+
+      .cad-canvas {
+        background: #ffffff !important;
+        border: 1px solid #94a3b8 !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- ENCABEZADO INSTITUCIONAL SOLO VISIBLE AL IMPRIMIR / EXPORTAR PDF -->
+  <div class="print-only hidden border-b-2 border-slate-900 pb-3 mb-4">
+    <div class="flex justify-between items-end">
+      <div>
+        <p class="text-xs uppercase tracking-widest text-slate-600 font-semibold">Departamento de Ingeniería Eléctrica y Electromagnética</p>
+        <h1 class="text-xl font-bold text-slate-900">Memoria de Cálculo: Análisis de Circuitos Magnéticos en Motores Eléctricos</h1>
+      </div>
+      <div class="text-right text-xs text-slate-600 font-mono">
+        <p id="print-date">Fecha: --/--/----</p>
+        <p>Constante μ₀ = 4π × 10⁻⁷ H/m</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA SUPERIOR DE NAVEGACIÓN (NO SE IMPRIME) -->
+  <header class="no-print bg-navy-900 text-white shadow-lg border-b border-slate-800 sticky top-0 z-30">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-sky-600/20 border border-sky-400/30 p-2 rounded-lg text-sky-400">
+          <!-- Icono SVG de bobina / campo magnético -->
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">MagneCalc Pro — Circuitos Magnéticos</h1>
+            <span class="hidden sm:inline-block text-[11px] font-mono bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-full">v2.0 Web CAD</span>
+          </div>
+          <p class="text-xs text-slate-400">Análisis Electromagnético Paso a Paso • Núcleo Doble Ventana / Motor Estator-Rotor</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Selector de Modo Geométrico -->
+        <div class="flex items-center bg-navy-950 border border-slate-700 rounded-lg p-1 text-xs">
+          <button id="btn-mode-auto" onclick="setAreaMode('auto')" class="px-2.5 py-1 rounded-md font-medium transition bg-sky-600 text-white" title="Calcula áreas automáticamente desde ancho y profundidad">
+            Áreas por Geometría
+          </button>
+          <button id="btn-mode-manual" onclick="setAreaMode('manual')" class="px-2.5 py-1 rounded-md font-medium transition text-slate-300 hover:text-white" title="Permite introducir áreas Ax, Ay, AT directamente en cm²">
+            Áreas Directas (cm²)
+          </button>
+        </div>
+
+        <button onclick="exportToPDF()" class="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-lg shadow transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          Exportar / Imprimir PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-5 print-container">
+    
+    <!-- NOTIFICACIÓN FLOTANTE (EN LUGAR DE ALERT) -->
+    <div id="toast-notification" class="no-print fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+      <div class="bg-navy-900 text-white border border-sky-500/40 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="toast-message">Cálculos actualizados correctamente.</span>
+      </div>
+    </div>
+
+    <!-- GRID PRINCIPAL: IZQUIERDA (ENTRADAS) | DERECHA (DIAGRAMAS + RESULTADOS + MEMORIA) -->
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+      
+      <!-- ===================================================================== -->
+      <!-- COLUMNA IZQUIERDA: PANEL DE ENTRADA DE DATOS (4 COLUMNAS EN XL)       -->
+      <!-- ===================================================================== -->
+      <aside class="xl:col-span-4 space-y-4 print-card bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span class="w-2 h-5 bg-sky-600 rounded-sm inline-block"></span>
+              1. Parámetros de Entrada
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">Modifica los valores; las conversiones a SI son automáticas.</p>
+          </div>
+          <span class="text-[11px] font-mono bg-slate-100 text-slate-700 px-2 py-1 rounded border border-slate-200">
+            μ₀ = 4π×10⁻⁷
+          </span>
+        </div>
+
+        <!-- GRUPO A: EXCITACIÓN ELÉCTRICA Y MATERIAL -->
+        <div class="bg-slate-50 rounded-lg p-3.5 border border-slate-200/80 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-navy-850 flex items-center justify-between">
+            <span>A. Excitación y Material Ferromagnético</span>
+            <span class="text-[10px] font-normal text-slate-500">Bobina Central</span>
+          </h3>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Número de espiras N -->
+            <div>
+              <label for="inp-N" class="block text-xs font-semibold text-slate-700 mb-1">Espiras (N)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-N" step="1" min="1" value="500" oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-white border border-slate-300 rounded-lg pl-3 pr-16 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none" />
+                <span class="absolute right-2.5 text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">vueltas</span>
+              </div>
+            </div>
+
+            <!-- Corriente I -->
+            <div>
+              <label for="inp-I" class="block text-xs font-semibold text-slate-700 mb-1">Corriente (I)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-I" step="0.1" min="0.001" value="2.5" oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-white border border-slate-300 rounded-lg pl-3 pr-12 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none" />
+                <span class="absolute right-2.5 text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">A</span>
+              </div>
+            </div>
+
+            <!-- Permeabilidad relativa μr -->
+            <div>
+              <label for="inp-mur" class="block text-xs font-semibold text-slate-700 mb-1">Permeabilidad (μᵣ)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-mur" step="50" min="1" value="2500" oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-white border border-slate-300 rounded-lg pl-3 pr-14 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none" />
+                <span class="absolute right-2.5 text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">adim.</span>
+              </div>
+            </div>
+
+            <!-- Factor de apilamiento ka -->
+            <div>
+              <label for="inp-ka" class="block text-xs font-semibold text-slate-700 mb-1" title="Factor de apilamiento de chapas magnéticas (1.0 = núcleo sólido)">Factor Apilam. (kₐ)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-ka" step="0.01" min="0.5" max="1" value="1.00" oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-white border border-slate-300 rounded-lg pl-3 pr-14 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none" />
+                <span class="absolute right-2.5 text-xs font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">0–1</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Datos opcionales de placa (Voltaje / Frecuencia referenciales) -->
+          <div class="grid grid-cols-2 gap-3 pt-1 border-t border-slate-200/70">
+            <div>
+              <label for="inp-V" class="block text-[11px] font-medium text-slate-600 mb-1">Voltaje Ref. (V)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-V" step="1" value="120" oninput="handleInputChange()"
+                  class="w-full font-mono text-xs bg-white border border-slate-300 rounded-md pl-2.5 pr-10 py-1.5 focus:ring-1 focus:ring-sky-500 outline-none" />
+                <span class="absolute right-2 text-[11px] font-mono text-slate-400">V</span>
+              </div>
+            </div>
+            <div>
+              <label for="inp-f" class="block text-[11px] font-medium text-slate-600 mb-1">Frecuencia Ref. (f)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-f" step="1" value="60" oninput="handleInputChange()"
+                  class="w-full font-mono text-xs bg-white border border-slate-300 rounded-md pl-2.5 pr-10 py-1.5 focus:ring-1 focus:ring-sky-500 outline-none" />
+                <span class="absolute right-2 text-[11px] font-mono text-slate-400">Hz</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO B: DIMENSIONES GEOMÉTRICAS Y TRAYECTORIAS -->
+        <div class="bg-slate-50 rounded-lg p-3.5 border border-slate-200/80 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-navy-850 flex items-center justify-between">
+            <span>B. Longitudes de Trayectoria Media</span>
+            <span class="text-[10px] font-mono text-sky-700 bg-sky-100 px-1.5 py-0.5 rounded">cm → m</span>
+          </h3>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <!-- Longitud rama central lT -->
+            <div>
+              <label for="inp-lT" class="block text-xs font-semibold text-slate-700 mb-1">Long. Central (l<sub>T</sub>)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-lT" step="0.5" min="0.1" value="15.0" oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-white border border-slate-300 rounded-lg pl-2.5 pr-9 py-1.5 focus:ring-2 focus:ring-sky-500 outline-none" />
+                <span class="absolute right-2 text-xs font-mono text-slate-500">cm</span>
+              </div>
+              <p id="conv-lT" class="text-[10px] font-mono text-slate-500 mt-0.5">= 0.1500 m</p>
+            </div>
+
+            <!-- Longitud rama X lx -->
+            <div>
+              <label for="inp-lx" class="block text-xs font-semibold text-slate-700 mb-1">Long. Rama X (l<sub>x</sub>)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-lx" step="0.5" min="0.1" value="35.0" oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-white border border-slate-300 rounded-lg pl-2.5 pr-9 py-1.5 focus:ring-2 focus:ring-sky-500 outline-none" />
+                <span class="absolute right-2 text-xs font-mono text-slate-500">cm</span>
+              </div>
+              <p id="conv-lx" class="text-[10px] font-mono text-slate-500 mt-0.5">= 0.3500 m</p>
+            </div>
+
+            <!-- Longitud rama Y ly -->
+            <div>
+              <label for="inp-ly" class="block text-xs font-semibold text-slate-700 mb-1">Long. Rama Y (l<sub>y</sub>)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-ly" step="0.5" min="0.1" value="40.0" oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-white border border-slate-300 rounded-lg pl-2.5 pr-9 py-1.5 focus:ring-2 focus:ring-sky-500 outline-none" />
+                <span class="absolute right-2 text-xs font-mono text-slate-500">cm</span>
+              </div>
+              <p id="conv-ly" class="text-[10px] font-mono text-slate-500 mt-0.5">= 0.4000 m</p>
+            </div>
+          </div>
+
+          <!-- Entrehierros (Opcional, si g > 0 se incluye en la reluctancia de la rama) -->
+          <div class="pt-2 border-t border-slate-200">
+            <p class="text-[11px] font-semibold text-slate-700 mb-2">Entrehierros / Polos (dejar en 0 si el núcleo es continuo)</p>
+            <div class="grid grid-cols-3 gap-2.5">
+              <div>
+                <label for="inp-gT" class="block text-[11px] text-slate-600 mb-0.5">Entreh. Central (g<sub>T</sub>)</label>
+                <div class="relative flex items-center">
+                  <input type="number" id="inp-gT" step="0.05" min="0" value="0.0" oninput="handleInputChange()"
+                    class="w-full font-mono text-xs bg-white border border-slate-300 rounded-md pl-2 pr-8 py-1.5 focus:ring-1 focus:ring-sky-500 outline-none" />
+                  <span class="absolute right-1.5 text-[10px] font-mono text-slate-400">mm</span>
+                </div>
+              </div>
+              <div>
+                <label for="inp-gx" class="block text-[11px] text-slate-600 mb-0.5">Entreh. Rama X (g<sub>x</sub>)</label>
+                <div class="relative flex items-center">
+                  <input type="number" id="inp-gx" step="0.05" min="0" value="0.5" oninput="handleInputChange()"
+                    class="w-full font-mono text-xs bg-white border border-slate-300 rounded-md pl-2 pr-8 py-1.5 focus:ring-1 focus:ring-sky-500 outline-none" />
+                  <span class="absolute right-1.5 text-[10px] font-mono text-slate-400">mm</span>
+                </div>
+              </div>
+              <div>
+                <label for="inp-gy" class="block text-[11px] text-slate-600 mb-0.5">Entreh. Rama Y (g<sub>y</sub>)</label>
+                <div class="relative flex items-center">
+                  <input type="number" id="inp-gy" step="0.05" min="0" value="0.5" oninput="handleInputChange()"
+                    class="w-full font-mono text-xs bg-white border border-slate-300 rounded-md pl-2 pr-8 py-1.5 focus:ring-1 focus:ring-sky-500 outline-none" />
+                  <span class="absolute right-1.5 text-[10px] font-mono text-slate-400">mm</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO C: DIMENSIONES DE SECCIÓN TRANSVERSAL Y ÁREAS -->
+        <div class="bg-slate-50 rounded-lg p-3.5 border border-slate-200/80 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-navy-850 flex items-center justify-between">
+            <span>C. Secciones Transversales y Áreas</span>
+            <span class="text-[10px] font-mono text-sky-700 bg-sky-100 px-1.5 py-0.5 rounded">cm² → m²</span>
+          </h3>
+
+          <!-- Panel de Geometría (Anchos y Profundidad) -->
+          <div id="geom-dimensions-panel" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div>
+              <label for="inp-wT" class="block text-[11px] font-semibold text-slate-700 mb-1">Ancho w<sub>T</sub></label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-wT" step="0.2" min="0.2" value="4.0" oninput="handleInputChange()"
+                  class="w-full font-mono text-xs bg-white border border-slate-300 rounded-md pl-2 pr-7 py-1.5 focus:ring-1 focus:ring-sky-500 outline-none" />
+                <span class="absolute right-1.5 text-[10px] font-mono text-slate-400">cm</span>
+              </div>
+            </div>
+            <div>
+              <label for="inp-wx" class="block text-[11px] font-semibold text-slate-700 mb-1">Ancho w<sub>x</sub></label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-wx" step="0.2" min="0.2" value="2.5" oninput="handleInputChange()"
+                  class="w-full font-mono text-xs bg-white border border-slate-300 rounded-md pl-2 pr-7 py-1.5 focus:ring-1 focus:ring-sky-500 outline-none" />
+                <span class="absolute right-1.5 text-[10px] font-mono text-slate-400">cm</span>
+              </div>
+            </div>
+            <div>
+              <label for="inp-wy" class="block text-[11px] font-semibold text-slate-700 mb-1">Ancho w<sub>y</sub></label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-wy" step="0.2" min="0.2" value="2.0" oninput="handleInputChange()"
+                  class="w-full font-mono text-xs bg-white border border-slate-300 rounded-md pl-2 pr-7 py-1.5 focus:ring-1 focus:ring-sky-500 outline-none" />
+                <span class="absolute right-1.5 text-[10px] font-mono text-slate-400">cm</span>
+              </div>
+            </div>
+            <div>
+              <label for="inp-depth" class="block text-[11px] font-semibold text-slate-700 mb-1">Profund. (d)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-depth" step="0.2" min="0.2" value="5.0" oninput="handleInputChange()"
+                  class="w-full font-mono text-xs bg-white border border-slate-300 rounded-md pl-2 pr-7 py-1.5 focus:ring-1 focus:ring-sky-500 outline-none" />
+                <span class="absolute right-1.5 text-[10px] font-mono text-slate-400">cm</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Áreas Transversales Resultantes o Directas (AT, Ax, Ay) -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+            <div>
+              <label for="inp-AT" class="block text-xs font-semibold text-slate-700 mb-1">Área Central (A<sub>T</sub>)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-AT" step="0.5" min="0.01" value="20.0" readonly oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-slate-100 text-slate-700 border border-slate-300 rounded-lg pl-2.5 pr-10 py-1.5 outline-none" />
+                <span class="absolute right-2 text-[11px] font-mono text-slate-500">cm²</span>
+              </div>
+              <p id="conv-AT" class="text-[10px] font-mono text-sky-700 mt-0.5">= 2.000×10⁻³ m²</p>
+            </div>
+
+            <div>
+              <label for="inp-Ax" class="block text-xs font-semibold text-slate-700 mb-1">Área Rama X (A<sub>x</sub>)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-Ax" step="0.5" min="0.01" value="12.5" readonly oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-slate-100 text-slate-700 border border-slate-300 rounded-lg pl-2.5 pr-10 py-1.5 outline-none" />
+                <span class="absolute right-2 text-[11px] font-mono text-slate-500">cm²</span>
+              </div>
+              <p id="conv-Ax" class="text-[10px] font-mono text-sky-700 mt-0.5">= 1.250×10⁻³ m²</p>
+            </div>
+
+            <div>
+              <label for="inp-Ay" class="block text-xs font-semibold text-slate-700 mb-1">Área Rama Y (A<sub>y</sub>)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="inp-Ay" step="0.5" min="0.01" value="10.0" readonly oninput="handleInputChange()"
+                  class="w-full font-mono text-sm bg-slate-100 text-slate-700 border border-slate-300 rounded-lg pl-2.5 pr-10 py-1.5 outline-none" />
+                <span class="absolute right-2 text-[11px] font-mono text-slate-500">cm²</span>
+              </div>
+              <p id="conv-Ay" class="text-[10px] font-mono text-sky-700 mt-0.5">= 1.000×10⁻³ m²</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTONES DE ACCIÓN PRINCIPALES -->
+        <div class="no-print grid grid-cols-2 gap-3 pt-1">
+          <button onclick="calculateAll(true)" class="bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white font-bold text-sm py-2.5 px-4 rounded-xl shadow-md shadow-sky-600/20 transition flex items-center justify-center gap-2 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            CALCULAR
+          </button>
+          <button onclick="resetDefaults()" class="bg-slate-200 hover:bg-slate-300 active:scale-[0.99] text-slate-800 font-semibold text-sm py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            RESTAURAR VALORES
+          </button>
+        </div>
+
+        <!-- TABLA RÁPIDA DE CONVERSIONES AL SISTEMA INTERNACIONAL -->
+        <div class="bg-navy-900 text-slate-200 rounded-lg p-3 text-xs font-mono">
+          <div class="flex items-center justify-between text-sky-400 font-semibold mb-1.5 border-b border-slate-700 pb-1">
+            <span>Conversión Activa al Sistema Internacional (SI)</span>
+            <span>1 cm² = 10⁻⁴ m²</span>
+          </div>
+          <div id="si-conversion-summary" class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-300">
+            <!-- Se llena dinámicamente -->
+          </div>
+        </div>
+      </aside>
+
+      <!-- ===================================================================== -->
+      <!-- COLUMNA DERECHA: DIAGRAMAS 2D + RESULTADOS + MEMORIA (8 COLS EN XL)   -->
+      <!-- ===================================================================== -->
+      <section class="xl:col-span-8 space-y-6">
+
+        <!-- SECCIÓN 2: REPRESENTACIÓN GRÁFICA 2D TÉCNICA (PLANO + CIRCUITO EQUIVALENTE) -->
+        <div class="print-card bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 mb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-2 h-5 bg-amber-500 rounded-sm inline-block"></span>
+                2. Planos Técnicos 2D y Circuito Magnético Equivalente
+              </h2>
+              <p class="text-xs text-slate-500">Esquema paramétrico en tiempo real: proporciones, líneas de cota, trayectorias Φ y red de reluctancias.</p>
+            </div>
+            <div class="flex items-center gap-3 text-xs font-mono">
+              <span class="flex items-center gap-1.5 text-sky-700"><span class="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block"></span> Φ<sub>T</sub> Total</span>
+              <span class="flex items-center gap-1.5 text-emerald-700"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Φ<sub>x</sub> Izq.</span>
+              <span class="flex items-center gap-1.5 text-amber-700"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Φ<sub>y</sub> Der.</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- SVG 1: PLANO GEOMÉTRICO DEL NÚCLEO DEL MOTOR (7 COLS) -->
+            <div class="lg:col-span-7 flex flex-col">
+              <div class="flex items-center justify-between text-xs font-semibold text-slate-600 mb-1.5">
+                <span>A) Plano Esquemático del Núcleo Magnético y Devanado</span>
+                <span class="font-mono text-[11px] text-slate-400">ESCALA DINÁMICA</span>
+              </div>
+              <div class="cad-canvas rounded-xl border border-slate-300 overflow-hidden flex-1 flex items-center justify-center p-2">
+                <svg id="svg-motor-core" viewBox="0 0 560 390" class="w-full h-auto max-h-[380px] select-none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Generado dinámicamente por JavaScript -->
+                </svg>
+              </div>
+            </div>
+
+            <!-- SVG 2: CIRCUITO MAGNÉTICO EQUIVALENTE (5 COLS) -->
+            <div class="lg:col-span-5 flex flex-col">
+              <div class="flex items-center justify-between text-xs font-semibold text-slate-600 mb-1.5">
+                <span>B) Circuito Magnético Equivalente</span>
+                <span class="font-mono text-[11px] text-slate-400">ANALOGÍA DE HOPKINSON</span>
+              </div>
+              <div class="bg-slate-50 rounded-xl border border-slate-300 overflow-hidden flex-1 flex items-center justify-center p-2">
+                <svg id="svg-magnetic-circuit" viewBox="0 0 420 390" class="w-full h-auto max-h-[380px] select-none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Generado dinámicamente por JavaScript -->
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 3: VISTA GENERAL DE RESULTADOS FINALES (TARJETAS + TABLA RESUMEN) -->
+        <div class="print-card bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 mb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-2 h-5 bg-emerald-600 rounded-sm inline-block"></span>
+                3. Resumen Ejecutivo de Resultados (Incisos a – g)
+              </h2>
+              <p class="text-xs text-slate-500">Magnitudes electromagnéticas calculadas con precisión completa en unidades del SI y submúltiplos.</p>
+            </div>
+            <div id="validation-badge" class="text-xs font-mono px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              ✓ Conservación de Flujo: ΦT = Φx + Φy
+            </div>
+          </div>
+
+          <!-- TARJETAS DESTACADAS DE INCISOS A - G -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 mb-5" id="results-kpi-grid">
+            <!-- Renderizado dinámicamente -->
+          </div>
+
+          <!-- TABLA RESUMEN DETALLADA -->
+          <div class="overflow-x-auto rounded-lg border border-slate-200">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-navy-900 text-white font-semibold">
+                  <th class="py-2.5 px-3">Inciso</th>
+                  <th class="py-2.5 px-3">Magnitud Física</th>
+                  <th class="py-2.5 px-3">Símbolo</th>
+                  <th class="py-2.5 px-3">Valor en Sistema Internacional (SI)</th>
+                  <th class="py-2.5 px-3">Unidad Práctica / Submúltiplo</th>
+                </tr>
+              </thead>
+              <tbody id="summary-table-body" class="divide-y divide-slate-200 font-mono text-slate-800">
+                <!-- Filas generadas dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 4: DESARROLLO MATEMÁTICO PASO A PASO (MEMORIA DE CÁLCULO) -->
+        <div class="print-card bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 mb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-2 h-5 bg-sky-600 rounded-sm inline-block"></span>
+                4. Memoria de Cálculo y Desarrollo Matemático Paso a Paso
+              </h2>
+              <p class="text-xs text-slate-500">Procedimiento analítico detallado: fórmula general, sustitución numérica, operaciones intermedias y resultado.</p>
+            </div>
+
+            <!-- SELECTOR DE PESTAÑAS PARA CONSULTAR INCISOS INDIVIDUALMENTE O TODOS -->
+            <div class="no-print flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-mono">
+              <button onclick="filterStep('all')" data-step="all" class="step-tab px-2.5 py-1 rounded-md font-semibold bg-navy-900 text-white transition cursor-pointer">Todos</button>
+              <button onclick="filterStep('fmm')" data-step="fmm" class="step-tab px-2.5 py-1 rounded-md text-slate-700 hover:bg-white transition cursor-pointer">FMM & ℛ</button>
+              <button onclick="filterStep('a')" data-step="a" class="step-tab px-2.5 py-1 rounded-md text-slate-700 hover:bg-white transition cursor-pointer">a) ΦT</button>
+              <button onclick="filterStep('b')" data-step="b" class="step-tab px-2.5 py-1 rounded-md text-slate-700 hover:bg-white transition cursor-pointer">b) Φx</button>
+              <button onclick="filterStep('c')" data-step="c" class="step-tab px-2.5 py-1 rounded-md text-slate-700 hover:bg-white transition cursor-pointer">c) Φy</button>
+              <button onclick="filterStep('d')" data-step="d" class="step-tab px-2.5 py-1 rounded-md text-slate-700 hover:bg-white transition cursor-pointer">d) Bx</button>
+              <button onclick="filterStep('e')" data-step="e" class="step-tab px-2.5 py-1 rounded-md text-slate-700 hover:bg-white transition cursor-pointer">e) By</button>
+              <button onclick="filterStep('f')" data-step="f" class="step-tab px-2.5 py-1 rounded-md text-slate-700 hover:bg-white transition cursor-pointer">f) Hx</button>
+              <button onclick="filterStep('g')" data-step="g" class="step-tab px-2.5 py-1 rounded-md text-slate-700 hover:bg-white transition cursor-pointer">g) Hy</button>
+            </div>
+          </div>
+
+          <!-- CONTENEDOR DE BLOQUES MATEMÁTICOS -->
+          <div id="math-steps-container" class="space-y-4">
+            <!-- Se genera dinámicamente con el procedimiento completo -->
+          </div>
+
+          <!-- NOTA METODOLÓGICA DE INGENIERÍA -->
+          <div class="mt-5 bg-slate-50 border border-slate-200 rounded-lg p-3.5 text-xs text-slate-600 space-y-1">
+            <p class="font-bold text-slate-800">Notas Metodológicas del Modelo Electromagnético:</p>
+            <ul class="list-disc list-inside space-y-0.5">
+              <li>Permeabilidad magnética del vacío: <span class="font-mono text-slate-800">μ₀ = 4π × 10⁻⁷ H/m ≈ 1.25663706 × 10⁻⁶ T·m/(A·vuelta)</span>.</li>
+              <li>Cuando el entrehierro <span class="font-mono">g &gt; 0</span> en una rama, su reluctancia <span class="font-mono">ℛg = g / (μ₀ · A)</span> se suma en serie con la reluctancia del hierro de esa misma rama (<span class="font-mono">μr = 1</span> en el aire).</li>
+              <li>Los flujos en las ramas paralelas X e Y se determinan mediante divisor de flujo magnético: <span class="font-mono">Φx = ΦT · [ℛy,eq / (ℛx,eq + ℛy,eq)]</span> y <span class="font-mono">Φy = ΦT · [ℛx,eq / (ℛx,eq + ℛy,eq)]</span>.</li>
+            </ul>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <!-- PIE DE PÁGINA -->
+  <footer class="no-print bg-white border-t border-slate-200 mt-8 py-4 text-center text-xs text-slate-500">
+    <p>Simulador Interactivo de Circuitos Magnéticos de Motores Eléctricos • Cálculo Electromagnético de Alta Precisión</p>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- MOTOR DE CÁLCULO ELECTROMAGNÉTICO, RENDERIZADO SVG 2D Y MEMORIA DE CÁLCULO -->
+  <!-- ========================================================================= -->
+  <script>
+    // Constante física: Permeabilidad magnética del espacio libre (H/m o Wb/(A·vuelta·m))
+    const MU_0 = 4 * Math.PI * 1e-7;
+
+    // Estado global de la aplicación
+    let areaMode = 'auto'; // 'auto' (calcula A = w * depth * ka) o 'manual' (introduce Ax, Ay, AT directo)
+    let currentStepFilter = 'all';
+
+    // Valores por defecto representativos de un motor/núcleo doble ventana con bobina central
+    const DEFAULT_VALUES = {
+      N: 500,       // Espiras (vueltas)
+      I: 2.5,       // Corriente (A)
+      mur: 2500,    // Permeabilidad relativa del acero al silicio
+      ka: 1.00,     // Factor de apilamiento
+      V: 120,       // Voltaje referencial (V)
+      f: 60,        // Frecuencia referencial (Hz)
+      lT: 15.0,     // Longitud trayectoria central (cm)
+      lx: 35.0,     // Longitud trayectoria rama izquierda X (cm)
+      ly: 40.0,     // Longitud trayectoria rama derecha Y (cm)
+      gT: 0.0,      // Entrehierro rama central (mm)
+      gx: 0.5,      // Entrehierro rama X (mm)
+      gy: 0.5,      // Entrehierro rama Y (mm)
+      wT: 4.0,      // Ancho columna central (cm)
+      wx: 2.5,      // Ancho columna izquierda X (cm)
+      wy: 2.0,      // Ancho columna derecha Y (cm)
+      depth: 5.0,   // Profundidad de apilamiento del núcleo (cm)
+      AT: 20.0,     // Área transversal central (cm²)
+      Ax: 12.5,     // Área transversal rama X (cm²)
+      Ay: 10.0      // Área transversal rama Y (cm²)
+    };
+
+    // Utilidades de formateo científico y numérico
+    function fmtSci(num, digits = 4) {
+      if (!isFinite(num) || isNaN(num)) return '0.0000';
+      if (num === 0) return '0.0000';
+      const absVal = Math.abs(num);
+      if (absVal >= 1e-2 && absVal < 1e4) {
+        return num.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+      }
+      const expStr = num.toExponential(digits);
+      const [mantissa, exponent] = expStr.split('e');
+      const expNum = parseInt(exponent, 10);
+      return `${mantissa} × 10<sup>${expNum}</sup>`;
+    }
+
+    function fmtSciPlain(num, digits = 3) {
+      if (!isFinite(num) || isNaN(num) || num === 0) return '0';
+      const absVal = Math.abs(num);
+      if (absVal >= 1e-2 && absVal < 1e4) {
+        return num.toFixed(digits);
+      }
+      return num.toExponential(digits);
+    }
+
+    function fmtFixed(num, digits = 4) {
+      if (!isFinite(num) || isNaN(num)) return '0.0000';
+      return num.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    }
+
+    // Mostrar notificación discreta en pantalla
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast-notification');
+      const toastMsg = document.getElementById('toast-message');
+      toastMsg.textContent = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2600);
+    }
+
+    // Cambiar entre cálculo de áreas por geometría o ingreso directo en cm²
+    function setAreaMode(mode) {
+      areaMode = mode;
+      const btnAuto = document.getElementById('btn-mode-auto');
+      const btnManual = document.getElementById('btn-mode-manual');
+      const geomPanel = document.getElementById('geom-dimensions-panel');
+      const areaInputs = ['inp-AT', 'inp-Ax', 'inp-Ay'].map(id => document.getElementById(id));
+
+      if (mode === 'auto') {
+        btnAuto.className = 'px-2.5 py-1 rounded-md font-medium transition bg-sky-600 text-white cursor-pointer';
+        btnManual.className = 'px-2.5 py-1 rounded-md font-medium transition text-slate-300 hover:text-white cursor-pointer';
+        geomPanel.classList.remove('opacity-50', 'pointer-events-none');
+        areaInputs.forEach(inp => {
+          inp.setAttribute('readonly', true);
+          inp.classList.add('bg-slate-100', 'text-slate-700');
+          inp.classList.remove('bg-white', 'text-slate-900', 'ring-1', 'ring-sky-300');
+        });
+      } else {
+        btnManual.className = 'px-2.5 py-1 rounded-md font-medium transition bg-sky-600 text-white cursor-pointer';
+        btnAuto.className = 'px-2.5 py-1 rounded-md font-medium transition text-slate-300 hover:text-white cursor-pointer';
+        geomPanel.classList.add('opacity-50', 'pointer-events-none');
+        areaInputs.forEach(inp => {
+          inp.removeAttribute('readonly');
+          inp.classList.remove('bg-slate-100', 'text-slate-700');
+          inp.classList.add('bg-white', 'text-slate-900', 'ring-1', 'ring-sky-300');
+        });
+      }
+      calculateAll(false);
+    }
+
+    // Filtrar vista de desarrollo matemático
+    function filterStep(stepKey) {
+      currentStepFilter = stepKey;
+      document.querySelectorAll('.step-tab').forEach(btn => {
+        if (btn.dataset.step === stepKey) {
+          btn.className = 'step-tab px-2.5 py-1 rounded-md font-semibold bg-navy-900 text-white transition cursor-pointer';
+        } else {
+          btn.className = 'step-tab px-2.5 py-1 rounded-md text-slate-700 hover:bg-white transition cursor-pointer';
+        }
+      });
+
+      document.querySelectorAll('.inciso-card').forEach(card => {
+        if (stepKey === 'all' || card.dataset.step === stepKey) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    // Leer entradas del formulario y sanear valores positivos
+    function readInputs() {
+      const getVal = (id, fallback) => {
+        const val = parseFloat(document.getElementById(id).value);
+        return isNaN(val) ? fallback : val;
+      };
+
+      const N = Math.max(1, getVal('inp-N', DEFAULT_VALUES.N));
+      const I = Math.max(0.0001, getVal('inp-I', DEFAULT_VALUES.I));
+      const mur = Math.max(1, getVal('inp-mur', DEFAULT_VALUES.mur));
+      const ka = Math.min(1, Math.max(0.1, getVal('inp-ka', DEFAULT_VALUES.ka)));
+      const V = Math.max(0, getVal('inp-V', DEFAULT_VALUES.V));
+      const f = Math.max(1, getVal('inp-f', DEFAULT_VALUES.f));
+
+      const lT_cm = Math.max(0.01, getVal('inp-lT', DEFAULT_VALUES.lT));
+      const lx_cm = Math.max(0.01, getVal('inp-lx', DEFAULT_VALUES.lx));
+      const ly_cm = Math.max(0.01, getVal('inp-ly', DEFAULT_VALUES.ly));
+
+      const gT_mm = Math.max(0, getVal('inp-gT', DEFAULT_VALUES.gT));
+      const gx_mm = Math.max(0, getVal('inp-gx', DEFAULT_VALUES.gx));
+      const gy_mm = Math.max(0, getVal('inp-gy', DEFAULT_VALUES.gy));
+
+      const wT_cm = Math.max(0.1, getVal('inp-wT', DEFAULT_VALUES.wT));
+      const wx_cm = Math.max(0.1, getVal('inp-wx', DEFAULT_VALUES.wx));
+      const wy_cm = Math.max(0.1, getVal('inp-wy', DEFAULT_VALUES.wy));
+      const depth_cm = Math.max(0.1, getVal('inp-depth', DEFAULT_VALUES.depth));
+
+      let AT_cm2, Ax_cm2, Ay_cm2;
+      if (areaMode === 'auto') {
+        AT_cm2 = wT_cm * depth_cm * ka;
+        Ax_cm2 = wx_cm * depth_cm * ka;
+        Ay_cm2 = wy_cm * depth_cm * ka;
+        document.getElementById('inp-AT').value = AT_cm2.toFixed(2);
+        document.getElementById('inp-Ax').value = Ax_cm2.toFixed(2);
+        document.getElementById('inp-Ay').value = Ay_cm2.toFixed(2);
+      } else {
+        AT_cm2 = Math.max(0.01, getVal('inp-AT', DEFAULT_VALUES.AT));
+        Ax_cm2 = Math.max(0.01, getVal('inp-Ax', DEFAULT_VALUES.Ax));
+        Ay_cm2 = Math.max(0.01, getVal('inp-Ay', DEFAULT_VALUES.Ay));
+        // Actualizar anchos proporcionales aproximados para el dibujo 2D
+        const estW_T = AT_cm2 / (depth_cm * ka);
+        const estW_x = Ax_cm2 / (depth_cm * ka);
+        const estW_y = Ay_cm2 / (depth_cm * ka);
+        document.getElementById('inp-wT').value = estW_T.toFixed(2);
+        document.getElementById('inp-wx').value = estW_x.toFixed(2);
+        document.getElementById('inp-wy').value = estW_y.toFixed(2);
+      }
+
+      return {
+        N, I, mur, ka, V, f,
+        lT_cm, lx_cm, ly_cm,
+        gT_mm, gx_mm, gy_mm,
+        wT_cm: parseFloat(document.getElementById('inp-wT').value),
+        wx_cm: parseFloat(document.getElementById('inp-wx').value),
+        wy_cm: parseFloat(document.getElementById('inp-wy').value),
+        depth_cm,
+        AT_cm2, Ax_cm2, Ay_cm2
+      };
+    }
+
+    // Manejador en tiempo real al editar cualquier input
+    function handleInputChange() {
+      calculateAll(false);
+    }
+
+    // Restaurar valores originales del ejercicio
+    function resetDefaults() {
+      Object.keys(DEFAULT_VALUES).forEach(key => {
+        const el = document.getElementById(`inp-${key}`);
+        if (el) el.value = DEFAULT_VALUES[key];
+      });
+      setAreaMode('auto');
+      calculateAll(true);
+      showToast('Valores iniciales restaurados correctamente.');
+    }
+
+    // =========================================================================
+    // MOTOR PRINCIPAL DE CÁLCULO ELECTROMAGNÉTICO
+    // =========================================================================
+    function calculateAll(notify = false) {
+      const d = readInputs();
+
+      // 1. Conversiones rigurosas al Sistema Internacional (SI)
+      const lT = d.lT_cm * 1e-2;      // cm -> m
+      const lx = d.lx_cm * 1e-2;      // cm -> m
+      const ly = d.ly_cm * 1e-2;      // cm -> m
+
+      const gT = d.gT_mm * 1e-3;      // mm -> m
+      const gx = d.gx_mm * 1e-3;      // mm -> m
+      const gy = d.gy_mm * 1e-3;      // mm -> m
+
+      const AT = d.AT_cm2 * 1e-4;     // cm² -> m²
+      const Ax = d.Ax_cm2 * 1e-4;     // cm² -> m²
+      const Ay = d.Ay_cm2 * 1e-4;     // cm² -> m²
+
+      // Permeabilidad absoluta del núcleo ferromagnético (H/m)
+      const mu_core = MU_0 * d.mur;
+
+      // Actualizar etiquetas de conversión inmediata debajo de cada campo
+      document.getElementById('conv-lT').textContent = `= ${lT.toFixed(4)} m`;
+      document.getElementById('conv-lx').textContent = `= ${lx.toFixed(4)} m`;
+      document.getElementById('conv-ly').textContent = `= ${ly.toFixed(4)} m`;
+      document.getElementById('conv-AT').innerHTML = `= ${fmtSci(AT, 3)} m²`;
+      document.getElementById('conv-Ax').innerHTML = `= ${fmtSci(Ax, 3)} m²`;
+      document.getElementById('conv-Ay').innerHTML = `= ${fmtSci(Ay, 3)} m²`;
+
+      document.getElementById('si-conversion-summary').innerHTML = `
+        <div>l<sub>T</sub> = ${lT.toFixed(4)} m</div>
+        <div>A<sub>T</sub> = ${fmtSci(AT, 3)} m²</div>
+        <div>l<sub>x</sub> = ${lx.toFixed(4)} m</div>
+        <div>A<sub>x</sub> = ${fmtSci(Ax, 3)} m²</div>
+        <div>l<sub>y</sub> = ${ly.toFixed(4)} m</div>
+        <div>A<sub>y</sub> = ${fmtSci(Ay, 3)} m²</div>
+        <div>g<sub>x</sub> = ${gx.toExponential(2)} m</div>
+        <div>g<sub>y</sub> = ${gy.toExponential(2)} m</div>
+      `;
+
+      // 2. Fuerza Magnetomotriz (FMM)
+      // F = N * I (A·vuelta)
+      const FMM = d.N * d.I;
+
+      // 3. Reluctancias Individuales (A·vuelta / Wb)
+      // R = l / (μ0 * μr * A)
+      const Rc_T = lT / (mu_core * AT); // Núcleo rama central
+      const Rc_x = lx / (mu_core * Ax); // Núcleo rama izquierda X
+      const Rc_y = ly / (mu_core * Ay); // Núcleo rama derecha Y
+
+      // Reluctancias de entrehierros (μr = 1 en aire)
+      const Rg_T = gT > 0 ? gT / (MU_0 * AT) : 0;
+      const Rg_x = gx > 0 ? gx / (MU_0 * Ax) : 0;
+      const Rg_y = gy > 0 ? gy / (MU_0 * Ay) : 0;
+
+      // 4. Reluctancias Equivalentes por Rama (Serie: Núcleo + Entrehierro)
+      const Req_T = Rc_T + Rg_T;
+      const Req_x = Rc_x + Rg_x;
+      const Req_y = Rc_y + Rg_y;
+
+      // 5. Reluctancia Equivalente en Paralelo (Rama X || Rama Y)
+      const R_par = (Req_x * Req_y) / (Req_x + Req_y);
+
+      // 6. Reluctancia Total del Circuito (Serie: Rama Central + Paralelo XY)
+      const RT = Req_T + R_par;
+
+      // 7. Inciso a) Flujo Magnético Total (ΦT)
+      const phi_T = FMM / RT;           // Wb
+      const phi_T_mWb = phi_T * 1e3;    // mWb
+
+      // Fuerza magnetomotriz disponible en los nodos paralelos (F_ab = ΦT * R_par)
+      const F_ab = phi_T * R_par;
+
+      // 8. Inciso b) Flujo Magnético en Rama X (Φx) por divisor de flujo
+      const phi_x = phi_T * (Req_y / (Req_x + Req_y)); // Wb
+      const phi_x_mWb = phi_x * 1e3;                   // mWb
+
+      // 9. Inciso c) Flujo Magnético en Rama Y (Φy) por divisor de flujo
+      const phi_y = phi_T * (Req_x / (Req_x + Req_y)); // Wb
+      const phi_y_mWb = phi_y * 1e3;                   // mWb
+
+      // 10. Inciso d) Densidad de Flujo Magnético en Rama X (Bx)
+      const Bx = phi_x / Ax; // Tesla (T = Wb/m²)
+
+      // 11. Inciso e) Densidad de Flujo Magnético en Rama Y (By)
+      const By = phi_y / Ay; // Tesla (T = Wb/m²)
+
+      // Densidad en rama central (dato complementario útil)
+      const BT = phi_T / AT;
+
+      // 12. Inciso f) Intensidad de Campo Magnético en el núcleo de la Rama X (Hx)
+      const Hx = Bx / (MU_0 * d.mur); // A·vuelta / m
+
+      // 13. Inciso g) Intensidad de Campo Magnético en el núcleo de la Rama Y (Hy)
+      const Hy = By / (MU_0 * d.mur); // A·vuelta / m
+
+      // Intensidades en entrehierros (si aplican)
+      const Hg_x = gx > 0 ? Bx / MU_0 : 0;
+      const Hg_y = gy > 0 ? By / MU_0 : 0;
+
+      // Empaquetar resultados
+      const res = {
+        ...d,
+        lT, lx, ly, gT, gx, gy, AT, Ax, Ay, mu_core,
+        FMM, Rc_T, Rc_x, Rc_y, Rg_T, Rg_x, Rg_y,
+        Req_T, Req_x, Req_y, R_par, RT,
+        phi_T, phi_T_mWb, F_ab,
+        phi_x, phi_x_mWb,
+        phi_y, phi_y_mWb,
+        Bx, By, BT,
+        Hx, Hy, Hg_x, Hg_y
+      };
+
+      // Actualizar todas las vistas de la interfaz
+      renderSummaryKPIs(res);
+      renderSummaryTable(res);
+      renderMathSteps(res);
+      renderMotorSVG(res);
+      renderCircuitSVG(res);
+
+      // Reaplicar filtro de pestaña activa
+      filterStep(currentStepFilter);
+
+      if (notify) {
+        showToast('Cálculos electromagnéticos y planos 2D actualizados.');
+      }
+    }
+
+    // =========================================================================
+    // RENDERIZADO DE TARJETAS KPI Y TABLA RESUMEN
+    // =========================================================================
+    function renderSummaryKPIs(r) {
+      const kpis = [
+        { code: 'a)', label: 'Flujo Total ΦT', val: `${r.phi_T_mWb.toFixed(3)} mWb`, sub: `${fmtSciPlain(r.phi_T, 3)} Wb`, color: 'border-sky-500 bg-sky-50/60 text-sky-900' },
+        { code: 'b)', label: 'Flujo Rama Φx', val: `${r.phi_x_mWb.toFixed(3)} mWb`, sub: `${fmtSciPlain(r.phi_x, 3)} Wb`, color: 'border-emerald-500 bg-emerald-50/60 text-emerald-900' },
+        { code: 'c)', label: 'Flujo Rama Φy', val: `${r.phi_y_mWb.toFixed(3)} mWb`, sub: `${fmtSciPlain(r.phi_y, 3)} Wb`, color: 'border-amber-500 bg-amber-50/60 text-amber-900' },
+        { code: 'd)', label: 'Densidad Bx', val: `${r.Bx.toFixed(4)} T`, sub: `${(r.Bx * 1e4).toFixed(1)} Gauss`, color: 'border-indigo-500 bg-indigo-50/60 text-indigo-900' },
+        { code: 'e)', label: 'Densidad By', val: `${r.By.toFixed(4)} T`, sub: `${(r.By * 1e4).toFixed(1)} Gauss`, color: 'border-purple-500 bg-purple-50/60 text-purple-900' },
+        { code: 'f)', label: 'Intensidad Hx', val: `${r.Hx.toFixed(2)} A·v/m`, sub: `${(r.Hx / 100).toFixed(3)} A·v/cm`, color: 'border-slate-500 bg-slate-100/80 text-slate-900' },
+        { code: 'g)', label: 'Intensidad Hy', val: `${r.Hy.toFixed(2)} A·v/m`, sub: `${(r.Hy / 100).toFixed(3)} A·v/cm`, color: 'border-slate-500 bg-slate-100/80 text-slate-900' },
+      ];
+
+      const container = document.getElementById('results-kpi-grid');
+      container.innerHTML = kpis.map(k => `
+        <div class="border-t-4 ${k.color} rounded-lg p-2.5 border border-slate-200 shadow-2xs">
+          <div class="flex items-center justify-between text-[11px] font-bold opacity-80">
+            <span>${k.code}</span>
+            <span>${k.label}</span>
+          </div>
+          <div class="font-mono font-bold text-sm mt-1 truncate" title="${k.val}">${k.val}</div>
+          <div class="font-mono text-[10px] opacity-75 mt-0.5 truncate">${k.sub}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderSummaryTable(r) {
+      const rows = [
+        { inc: 'Aux', name: 'Fuerza Magnetomotriz (FMM)', sym: 'ℱ', si: `${fmtFixed(r.FMM, 2)} A·vuelta`, alt: `${fmtFixed(r.FMM, 2)} A·t` },
+        { inc: 'Aux', name: 'Reluctancia Total Equivalente', sym: 'ℛT', si: `${fmtSci(r.RT, 4)} A·vuelta/Wb`, alt: `${fmtSci(r.RT, 4)} H⁻¹` },
+        { inc: 'a)', name: 'Flujo Magnético Total', sym: 'ΦT', si: `${fmtSci(r.phi_T, 4)} Wb`, alt: `${fmtFixed(r.phi_T_mWb, 4)} mWb` },
+        { inc: 'b)', name: 'Flujo Magnético en Rama X', sym: 'Φx', si: `${fmtSci(r.phi_x, 4)} Wb`, alt: `${fmtFixed(r.phi_x_mWb, 4)} mWb` },
+        { inc: 'c)', name: 'Flujo Magnético en Rama Y', sym: 'Φy', si: `${fmtSci(r.phi_y, 4)} Wb`, alt: `${fmtFixed(r.phi_y_mWb, 4)} mWb` },
+        { inc: 'd)', name: 'Densidad de Flujo Magnético X', sym: 'Bx', si: `${fmtFixed(r.Bx, 4)} T (Wb/m²)`, alt: `${fmtFixed(r.Bx * 1e4, 2)} Gauss` },
+        { inc: 'e)', name: 'Densidad de Flujo Magnético Y', sym: 'By', si: `${fmtFixed(r.By, 4)} T (Wb/m²)`, alt: `${fmtFixed(r.By * 1e4, 2)} Gauss` },
+        { inc: 'f)', name: 'Intensidad de Campo Magnético X', sym: 'Hx', si: `${fmtFixed(r.Hx, 3)} A·vuelta/m`, alt: `${fmtFixed(r.Hx / 100, 4)} A·vuelta/cm` },
+        { inc: 'g)', name: 'Intensidad de Campo Magnético Y', sym: 'Hy', si: `${fmtFixed(r.Hy, 3)} A·vuelta/m`, alt: `${fmtFixed(r.Hy / 100, 4)} A·vuelta/cm` },
+      ];
+
+      document.getElementById('summary-table-body').innerHTML = rows.map(row => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2 px-3 font-bold text-sky-700">${row.inc}</td>
+          <td class="py-2 px-3 font-sans font-medium text-slate-800">${row.name}</td>
+          <td class="py-2 px-3 font-bold text-navy-900">${row.sym}</td>
+          <td class="py-2 px-3 font-semibold text-slate-900">${row.si}</td>
+          <td class="py-2 px-3 text-slate-600">${row.alt}</td>
+        </tr>
+      `).join('');
+    }
+
+    // =========================================================================
+    // RENDERIZADO DE LA MEMORIA DE CÁLCULO PASO A PASO
+    // =========================================================================
+    function renderMathSteps(r) {
+      const container = document.getElementById('math-steps-container');
+
+      // Bloque 0: FMM y Reluctancias Individuales y Equivalentes
+      const htmlFMM = `
+        <div class="inciso-card math-block rounded-xl border border-slate-200 p-4" data-step="fmm">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
+            <h3 class="text-sm font-bold text-navy-900">Paso Previo: Fuerza Magnetomotriz (ℱ) y Red de Reluctancias (ℛ)</h3>
+            <span class="text-xs font-mono bg-sky-100 text-sky-800 px-2 py-0.5 rounded">Ley de Hopkinson</span>
+          </div>
+          
+          <div class="space-y-3 text-xs font-mono text-slate-700 leading-relaxed">
+            <!-- 1. FMM -->
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200/70">
+              <p class="font-sans font-bold text-slate-800 mb-1">1. Fuerza Magnetomotriz de la Bobina Central:</p>
+              <p>Fórmula: &nbsp;&nbsp;&nbsp;&nbsp;ℱ = N · I</p>
+              <p>Sustitución: ℱ = (${r.N} vueltas) · (${r.I} A)</p>
+              <p class="text-sky-800 font-bold mt-1">Resultado: &nbsp;&nbsp;ℱ = ${fmtFixed(r.FMM, 2)} A·vuelta</p>
+            </div>
+
+            <!-- 2. Reluctancias Individuales -->
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200/70">
+              <p class="font-sans font-bold text-slate-800 mb-1">2. Reluctancias Individuales de los Tramos del Núcleo y Entrehierros:</p>
+              <p class="mb-2">Fórmula general: ℛ = l / (μ₀ · μᵣ · A) &nbsp;&nbsp;donde μ₀ · μᵣ = (4π × 10⁻⁷) · (${r.mur}) = ${fmtSci(r.mu_core, 4)} H/m</p>
+              
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 mt-2">
+                <div class="bg-white p-2.5 rounded border border-slate-200">
+                  <p class="font-bold text-sky-700">Rama Central (T):</p>
+                  <p>ℛ<sub>c,T</sub> = ${r.lT.toFixed(4)} / (${fmtSciPlain(r.mu_core, 3)} · ${fmtSciPlain(r.AT, 3)})</p>
+                  <p>ℛ<sub>c,T</sub> = ${fmtSci(r.Rc_T, 4)} A·v/Wb</p>
+                  ${r.gT > 0 ? `<p class="text-amber-700 mt-1">ℛ<sub>g,T</sub> = ${r.gT.toExponential(2)} / (μ₀ · ${fmtSciPlain(r.AT, 3)}) = ${fmtSci(r.Rg_T, 4)} A·v/Wb</p>` : `<p class="text-slate-400 mt-1">Sin entrehierro (g<sub>T</sub> = 0)</p>`}
+                  <p class="font-bold text-slate-900 mt-1 border-t pt-1">ℛ<sub>T,eq</sub> = ${fmtSci(r.Req_T, 4)} A·v/Wb</p>
+                </div>
+
+                <div class="bg-white p-2.5 rounded border border-slate-200">
+                  <p class="font-bold text-emerald-700">Rama Izquierda (X):</p>
+                  <p>ℛ<sub>c,x</sub> = ${r.lx.toFixed(4)} / (${fmtSciPlain(r.mu_core, 3)} · ${fmtSciPlain(r.Ax, 3)})</p>
+                  <p>ℛ<sub>c,x</sub> = ${fmtSci(r.Rc_x, 4)} A·v/Wb</p>
+                  ${r.gx > 0 ? `<p class="text-amber-700 mt-1">ℛ<sub>g,x</sub> = ${r.gx.toExponential(2)} / (μ₀ · ${fmtSciPlain(r.Ax, 3)}) = ${fmtSci(r.Rg_x, 4)} A·v/Wb</p>` : `<p class="text-slate-400 mt-1">Sin entrehierro (g<sub>x</sub> = 0)</p>`}
+                  <p class="font-bold text-slate-900 mt-1 border-t pt-1">ℛ<sub>x,eq</sub> = ${fmtSci(r.Req_x, 4)} A·v/Wb</p>
+                </div>
+
+                <div class="bg-white p-2.5 rounded border border-slate-200">
+                  <p class="font-bold text-amber-700">Rama Derecha (Y):</p>
+                  <p>ℛ<sub>c,y</sub> = ${r.ly.toFixed(4)} / (${fmtSciPlain(r.mu_core, 3)} · ${fmtSciPlain(r.Ay, 3)})</p>
+                  <p>ℛ<sub>c,y</sub> = ${fmtSci(r.Rc_y, 4)} A·v/Wb</p>
+                  ${r.gy > 0 ? `<p class="text-amber-700 mt-1">ℛ<sub>g,y</sub> = ${r.gy.toExponential(2)} / (μ₀ · ${fmtSciPlain(r.Ay, 3)}) = ${fmtSci(r.Rg_y, 4)} A·v/Wb</p>` : `<p class="text-slate-400 mt-1">Sin entrehierro (g<sub>y</sub> = 0)</p>`}
+                  <p class="font-bold text-slate-900 mt-1 border-t pt-1">ℛ<sub>y,eq</sub> = ${fmtSci(r.Req_y, 4)} A·v/Wb</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Reducción Paralelo y Serie Total -->
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200/70">
+              <p class="font-sans font-bold text-slate-800 mb-1">3. Reducción del Circuito Equivalente (Paralelo X || Y y Serie Total):</p>
+              <p>Paralelo: &nbsp;&nbsp;&nbsp;ℛ<sub>xy</sub> = (ℛ<sub>x,eq</sub> · ℛ<sub>y,eq</sub>) / (ℛ<sub>x,eq</sub> + ℛ<sub>y,eq</sub>)</p>
+              <p>Sustitución: ℛ<sub>xy</sub> = (${fmtSci(r.Req_x, 3)} · ${fmtSci(r.Req_y, 3)}) / (${fmtSci(r.Req_x, 3)} + ${fmtSci(r.Req_y, 3)}) = ${fmtSci(r.R_par, 4)} A·v/Wb</p>
+              <p class="mt-1">Serie Total: ℛ<sub>Total</sub> = ℛ<sub>T,eq</sub> + ℛ<sub>xy</sub> = ${fmtSci(r.Req_T, 4)} + ${fmtSci(r.R_par, 4)}</p>
+              <p class="text-sky-800 font-bold mt-1">Resultado: &nbsp;&nbsp;ℛ<sub>Total</sub> = ${fmtSci(r.RT, 4)} A·vuelta/Wb</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Helper para generar cada inciso (a hasta g) con estructura homogénea y profesional
+      const makeIncisoHTML = (stepKey, title, formula, substitution, intermediate, resultMain, resultAlt) => `
+        <div class="inciso-card math-block rounded-xl border border-slate-200 p-4" data-step="${stepKey}">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 mb-2.5">
+            <h3 class="text-sm font-bold text-navy-900">${title}</h3>
+            <span class="text-xs font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-md">
+              ${resultMain}
+            </span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-2 text-xs font-mono text-slate-700">
+            <div class="md:col-span-3 text-slate-500 font-sans font-semibold">Fórmula general:</div>
+            <div class="md:col-span-9 font-semibold text-slate-900">${formula}</div>
+
+            <div class="md:col-span-3 text-slate-500 font-sans font-semibold">Sustitución:</div>
+            <div class="md:col-span-9 break-words">${substitution}</div>
+
+            ${intermediate ? `
+              <div class="md:col-span-3 text-slate-500 font-sans font-semibold">Operación intermedia:</div>
+              <div class="md:col-span-9 text-slate-600">${intermediate}</div>
+            ` : ''}
+
+            <div class="md:col-span-3 text-slate-500 font-sans font-semibold">Resultado final:</div>
+            <div class="md:col-span-9 font-bold text-sky-800 bg-sky-50/70 px-2.5 py-1 rounded border border-sky-200/80 inline-block">
+              ${resultMain} ${resultAlt ? `<span class="text-slate-600 font-normal ml-2">(${resultAlt})</span>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+
+      const htmlA = makeIncisoHTML(
+        'a',
+        'Inciso a) Cálculo del Flujo Magnético Total (ΦT)',
+        'Φ<sub>T</sub> = ℱ / ℛ<sub>Total</sub>',
+        `Φ<sub>T</sub> = (${fmtFixed(r.FMM, 2)} A·vuelta) / (${fmtSci(r.RT, 4)} A·vuelta/Wb)`,
+        `Φ<sub>T</sub> = ${r.phi_T.toExponential(6)} Wb`,
+        `ΦT = ${fmtSci(r.phi_T, 4)} Wb`,
+        `${fmtFixed(r.phi_T_mWb, 4)} mWb`
+      );
+
+      const htmlB = makeIncisoHTML(
+        'b',
+        'Inciso b) Cálculo del Flujo Magnético en la Rama Izquierda (Φx)',
+        'Φ<sub>x</sub> = Φ<sub>T</sub> · [ ℛ<sub>y,eq</sub> / (ℛ<sub>x,eq</sub> + ℛ<sub>y,eq</sub>) ]',
+        `Φ<sub>x</sub> = (${fmtSci(r.phi_T, 4)} Wb) · [ ${fmtSci(r.Req_y, 4)} / (${fmtSci(r.Req_x, 4)} + ${fmtSci(r.Req_y, 4)}) ]`,
+        `Factor divisor = ${(r.Req_y / (r.Req_x + r.Req_y)).toFixed(5)} &nbsp;|&nbsp; FMM nodos paralelo ℱ<sub>ab</sub> = ${fmtFixed(r.F_ab, 2)} A·v`,
+        `Φx = ${fmtSci(r.phi_x, 4)} Wb`,
+        `${fmtFixed(r.phi_x_mWb, 4)} mWb`
+      );
+
+      const htmlC = makeIncisoHTML(
+        'c',
+        'Inciso c) Cálculo del Flujo Magnético en la Rama Derecha (Φy)',
+        'Φ<sub>y</sub> = Φ<sub>T</sub> · [ ℛ<sub>x,eq</sub> / (ℛ<sub>x,eq</sub> + ℛ<sub>y,eq</sub>) ]',
+        `Φ<sub>y</sub> = (${fmtSci(r.phi_T, 4)} Wb) · [ ${fmtSci(r.Req_x, 4)} / (${fmtSci(r.Req_x, 4)} + ${fmtSci(r.Req_y, 4)}) ]`,
+        `Verificación por Ley de Nodos: Φ<sub>x</sub> + Φ<sub>y</sub> = ${fmtFixed(r.phi_x_mWb, 4)} + ${fmtFixed(r.phi_y_mWb, 4)} = ${fmtFixed(r.phi_x_mWb + r.phi_y_mWb, 4)} mWb ≈ Φ<sub>T</sub>`,
+        `Φy = ${fmtSci(r.phi_y, 4)} Wb`,
+        `${fmtFixed(r.phi_y_mWb, 4)} mWb`
+      );
+
+      const htmlD = makeIncisoHTML(
+        'd',
+        'Inciso d) Cálculo de la Densidad de Flujo Magnético en Rama X (Bx)',
+        'B<sub>x</sub> = Φ<sub>x</sub> / A<sub>x</sub>',
+        `B<sub>x</sub> = (${fmtSci(r.phi_x, 4)} Wb) / (${fmtSci(r.Ax, 4)} m²)`,
+        `Área A<sub>x</sub> = ${r.Ax_cm2.toFixed(2)} cm² = ${r.Ax.toExponential(4)} m²`,
+        `Bx = ${fmtFixed(r.Bx, 4)} T`,
+        `${fmtFixed(r.Bx, 4)} Wb/m²`
+      );
+
+      const htmlE = makeIncisoHTML(
+        'e',
+        'Inciso e) Cálculo de la Densidad de Flujo Magnético en Rama Y (By)',
+        'B<sub>y</sub> = Φ<sub>y</sub> / A<sub>y</sub>',
+        `B<sub>y</sub> = (${fmtSci(r.phi_y, 4)} Wb) / (${fmtSci(r.Ay, 4)} m²)`,
+        `Área A<sub>y</sub> = ${r.Ay_cm2.toFixed(2)} cm² = ${r.Ay.toExponential(4)} m²`,
+        `By = ${fmtFixed(r.By, 4)} T`,
+        `${fmtFixed(r.By, 4)} Wb/m²`
+      );
+
+      const htmlF = makeIncisoHTML(
+        'f',
+        'Inciso f) Cálculo de la Intensidad de Campo Magnético en Rama X (Hx)',
+        'H<sub>x</sub> = B<sub>x</sub> / (μ₀ · μ<sub>r</sub>)',
+        `H<sub>x</sub> = (${fmtFixed(r.Bx, 4)} T) / (4π × 10⁻⁷ H/m · ${r.mur})`,
+        `Denominador μ₀·μ<sub>r</sub> = ${fmtSci(r.mu_core, 4)} H/m ${r.gx > 0 ? `| En entrehierro g<sub>x</sub>: H<sub>g,x</sub> = ${fmtFixed(r.Hg_x, 1)} A·v/m` : ''}`,
+        `Hx = ${fmtFixed(r.Hx, 3)} A·vuelta/m`,
+        `${fmtFixed(r.Hx / 100, 4)} A·vuelta/cm`
+      );
+
+      const htmlG = makeIncisoHTML(
+        'g',
+        'Inciso g) Cálculo de la Intensidad de Campo Magnético en Rama Y (Hy)',
+        'H<sub>y</sub> = B<sub>y</sub> / (μ₀ · μ<sub>r</sub>)',
+        `H<sub>y</sub> = (${fmtFixed(r.By, 4)} T) / (4π × 10⁻⁷ H/m · ${r.mur})`,
+        `Denominador μ₀·μ<sub>r</sub> = ${fmtSci(r.mu_core, 4)} H/m ${r.gy > 0 ? `| En entrehierro g<sub>y</sub>: H<sub>g,y</sub> = ${fmtFixed(r.Hg_y, 1)} A·v/m` : ''}`,
+        `Hy = ${fmtFixed(r.Hy, 3)} A·vuelta/m`,
+        `${fmtFixed(r.Hy / 100, 4)} A·vuelta/cm`
+      );
+
+      container.innerHTML = htmlFMM + htmlA + htmlB + htmlC + htmlD + htmlE + htmlF + htmlG;
+    }
+
+    // =========================================================================
+    // RENDERIZADO SVG 1: DIBUJO TÉCNICO 2D PARAMÉTRICO DEL NÚCLEO DEL MOTOR
+    // =========================================================================
+    function renderMotorSVG(r) {
+      const svg = document.getElementById('svg-motor-core');
+
+      // Escalado proporcional seguro para que el núcleo siempre luzca bien encuadrado
+      const maxW = Math.max(r.wT_cm, r.wx_cm, r.wy_cm, 1);
+      const scaleW = 36 / maxW; // Factor de escala visual para espesores
+      const wX = Math.min(52, Math.max(20, r.wx_cm * scaleW));
+      const wT = Math.min(64, Math.max(24, r.wT_cm * scaleW));
+      const wY = Math.min(52, Math.max(20, r.wy_cm * scaleW));
+      const yokeH = Math.min(38, Math.max(22, (wX + wY) * 0.45)); // Yugo superior e inferior
+
+      // Coordenadas del marco exterior del núcleo
+      const leftX = 95;
+      const rightX = 465;
+      const topY = 55;
+      const botY = 315;
+      const totalW = rightX - leftX;
+      const totalH = botY - topY;
+
+      // Posición de la columna central
+      const centerColX = leftX + (totalW - wT) / 2;
+
+      // Apertura visual de entrehierros si g > 0
+      const gapVisX = r.gx > 0 ? 7 : 0;
+      const gapVisY = r.gy > 0 ? 7 : 0;
+      const gapVisT = r.gT > 0 ? 7 : 0;
+      const midY = (topY + botY) / 2;
+
+      // Espiras visuales de la bobina alrededor de la columna central
+      let coilTurns = '';
+      const coilTop = topY + yokeH + 18;
+      const coilBot = botY - yokeH - 18;
+      const numVisualTurns = 7;
+      const stepTurn = (coilBot - coilTop) / numVisualTurns;
+      for (let i = 0; i < numVisualTurns; i++) {
+        const ty = coilTop + i * stepTurn + stepTurn * 0.2;
+        coilTurns += `
+          <rect x="${centerColX - 10}" y="${ty}" width="${wT + 20}" height="${stepTurn * 0.55}" rx="3"
+                fill="#f59e0b" stroke="#92400e" stroke-width="1.2" />
+        `;
+      }
+
+      svg.innerHTML = `
+        <defs>
+          <!-- Patrón de rayado técnico para acero laminado -->
+          <pattern id="steelHatch" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+            <line x1="0" y1="0" x2="0" y2="8" stroke="#94a3b8" stroke-width="1" opacity="0.35" />
+          </pattern>
+          <!-- Marcadores de flecha para flujos y cotas -->
+          <marker id="arrowSky" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#0284c7" />
+          </marker>
+          <marker id="arrowEmerald" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#059669" />
+          </marker>
+          <marker id="arrowAmber" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#d97706" />
+          </marker>
+          <marker id="dimTick" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M 0 2 L 8 5 L 0 8 z" fill="#475569" />
+          </marker>
+        </defs>
+
+        <!-- TÍTULO INTERNO DE PLANO -->
+        <text x="16" y="22" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#0f172a">
+          NÚCLEO FERROMAGNÉTICO (μr = ${r.mur} | Prof. d = ${r.depth_cm.toFixed(1)} cm)
+        </text>
+
+        <!-- CUERPO DEL NÚCLEO MAGNÉTICO (YUGOS + COLUMNAS) -->
+        <!-- Yugo Superior -->
+        <rect x="${leftX}" y="${topY}" width="${totalW}" height="${yokeH}" fill="#cbd5e1" stroke="#1e293b" stroke-width="1.8" />
+        <rect x="${leftX}" y="${topY}" width="${totalW}" height="${yokeH}" fill="url(#steelHatch)" />
+
+        <!-- Yugo Inferior -->
+        <rect x="${leftX}" y="${botY - yokeH}" width="${totalW}" height="${yokeH}" fill="#cbd5e1" stroke="#1e293b" stroke-width="1.8" />
+        <rect x="${leftX}" y="${botY - yokeH}" width="${totalW}" height="${yokeH}" fill="url(#steelHatch)" />
+
+        <!-- Columna Izquierda (Rama X) con posible entrehierro -->
+        <rect x="${leftX}" y="${topY + yokeH}" width="${wX}" height="${midY - (topY + yokeH) - gapVisX / 2}" fill="#cbd5e1" stroke="#1e293b" stroke-width="1.8" />
+        <rect x="${leftX}" y="${midY + gapVisX / 2}" width="${wX}" height="${(botY - yokeH) - (midY + gapVisX / 2)}" fill="#cbd5e1" stroke="#1e293b" stroke-width="1.8" />
+
+        <!-- Columna Derecha (Rama Y) con posible entrehierro -->
+        <rect x="${rightX - wY}" y="${topY + yokeH}" width="${wY}" height="${midY - (topY + yokeH) - gapVisY / 2}" fill="#cbd5e1" stroke="#1e293b" stroke-width="1.8" />
+        <rect x="${rightX - wY}" y="${midY + gapVisY / 2}" width="${wY}" height="${(botY - yokeH) - (midY + gapVisY / 2)}" fill="#cbd5e1" stroke="#1e293b" stroke-width="1.8" />
+
+        <!-- Columna Central (Rama T) con posible entrehierro -->
+        <rect x="${centerColX}" y="${topY + yokeH}" width="${wT}" height="${midY - (topY + yokeH) - gapVisT / 2}" fill="#cbd5e1" stroke="#1e293b" stroke-width="1.8" />
+        <rect x="${centerColX}" y="${midY + gapVisT / 2}" width="${wT}" height="${(botY - yokeH) - (midY + gapVisT / 2)}" fill="#cbd5e1" stroke="#1e293b" stroke-width="1.8" />
+
+        <!-- DEVANADO / BOBINA EN COLUMNA CENTRAL -->
+        ${coilTurns}
+        <!-- Terminales de corriente de la bobina -->
+        <line x1="${centerColX - 10}" y1="${coilTop + 8}" x2="${centerColX - 28}" y2="${coilTop + 8}" stroke="#b45309" stroke-width="2" />
+        <line x1="${centerColX - 10}" y1="${coilBot - 8}" x2="${centerColX - 28}" y2="${coilBot - 8}" stroke="#b45309" stroke-width="2" />
+        <circle cx="${centerColX - 28}" cy="${coilTop + 8}" r="3" fill="#ffffff" stroke="#b45309" stroke-width="1.8" />
+        <circle cx="${centerColX - 28}" cy="${coilBot - 8}" r="3" fill="#ffffff" stroke="#b45309" stroke-width="1.8" />
+        <text x="${centerColX - 32}" y="${coilTop + 4}" text-anchor="end" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#b45309">
+          + I=${r.I}A
+        </text>
+        <text x="${centerColX - 32}" y="${coilBot - 4}" text-anchor="end" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#b45309">
+          N=${r.N} esp.
+        </text>
+
+        <!-- TRAYECTORIAS MEDIAS DE FLUJO MAGNÉTICO (LÍNEAS DISCONTINUAS + FLECHAS) -->
+        <!-- Trayectoria Central ΦT -->
+        <line x1="${centerColX + wT / 2}" y1="${botY - yokeH / 2}" x2="${centerColX + wT / 2}" y2="${topY + yokeH / 2 + 6}"
+              stroke="#0284c7" stroke-width="2.2" stroke-dasharray="5,3" marker-end="url(#arrowSky)" />
+        <rect x="${centerColX + wT / 2 + 6}" y="${topY + yokeH + 2}" width="64" height="16" rx="3" fill="#e0f2fe" stroke="#0284c7" stroke-width="0.8" />
+        <text x="${centerColX + wT / 2 + 38}" y="${topY + yokeH + 13}" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#0369a1">
+          ΦT=${r.phi_T_mWb.toFixed(2)}mWb
+        </text>
+
+        <!-- Bucle Izquierdo Φx -->
+        <path d="M ${centerColX + wT / 2 - 6} ${topY + yokeH / 2} L ${leftX + wX / 2} ${topY + yokeH / 2} L ${leftX + wX / 2} ${botY - yokeH / 2} L ${centerColX + wT / 2 - 6} ${botY - yokeH / 2}"
+              fill="none" stroke="#059669" stroke-width="2" stroke-dasharray="5,3" marker-mid="url(#arrowEmerald)" />
+        <rect x="${leftX + wX + 8}" y="${midY - 26}" width="84" height="32" rx="4" fill="#ecfdf5" stroke="#059669" stroke-width="0.9" />
+        <text x="${leftX + wX + 50}" y="${midY - 13}" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#047857">
+          Φx=${r.phi_x_mWb.toFixed(2)}mWb
+        </text>
+        <text x="${leftX + wX + 50}" y="${midY - 1}" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#065f46">
+          lx=${r.lx_cm}cm | Ax=${r.Ax_cm2.toFixed(1)}cm²
+        </text>
+
+        <!-- Bucle Derecho Φy -->
+        <path d="M ${centerColX + wT / 2 + 6} ${topY + yokeH / 2} L ${rightX - wY / 2} ${topY + yokeH / 2} L ${rightX - wY / 2} ${botY - yokeH / 2} L ${centerColX + wT / 2 + 6} ${botY - yokeH / 2}"
+              fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="5,3" marker-mid="url(#arrowAmber)" />
+        <rect x="${rightX - wY - 94}" y="${midY - 26}" width="86" height="32" rx="4" fill="#fffbeb" stroke="#d97706" stroke-width="0.9" />
+        <text x="${rightX - wY - 51}" y="${midY - 13}" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#b45309">
+          Φy=${r.phi_y_mWb.toFixed(2)}mWb
+        </text>
+        <text x="${rightX - wY - 51}" y="${midY - 1}" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#92400e">
+          ly=${r.ly_cm}cm | Ay=${r.Ay_cm2.toFixed(1)}cm²
+        </text>
+
+        <!-- ETIQUETAS DE ENTREHIERROS SI APLICAN -->
+        ${r.gx > 0 ? `
+          <line x1="${leftX - 16}" y1="${midY}" x2="${leftX + wX + 4}" y2="${midY}" stroke="#dc2626" stroke-width="1.2" />
+          <text x="${leftX - 19}" y="${midY + 3}" text-anchor="end" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#dc2626">gx=${r.gx_mm}mm</text>
+        ` : ''}
+        ${r.gy > 0 ? `
+          <line x1="${rightX - wY - 4}" y1="${midY}" x2="${rightX + 16}" y2="${midY}" stroke="#dc2626" stroke-width="1.2" />
+          <text x="${rightX + 19}" y="${midY + 3}" text-anchor="start" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#dc2626">gy=${r.gy_mm}mm</text>
+        ` : ''}
+
+        <!-- LÍNEAS DE COTA TÉCNICAS (ANCHOS Y LONGITUDES) -->
+        <!-- Cota Ancho wx (Superior Izquierda) -->
+        <line x1="${leftX}" y1="${topY - 6}" x2="${leftX}" y2="${topY - 20}" stroke="#475569" stroke-width="1" />
+        <line x1="${leftX + wX}" y1="${topY - 6}" x2="${leftX + wX}" y2="${topY - 20}" stroke="#475569" stroke-width="1" />
+        <line x1="${leftX}" y1="${topY - 14}" x2="${leftX + wX}" y2="${topY - 14}" stroke="#475569" stroke-width="1.2" />
+        <text x="${leftX + wX / 2}" y="${topY - 18}" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#334155">wx=${r.wx_cm.toFixed(1)}cm</text>
+
+        <!-- Cota Ancho wT (Superior Centro) -->
+        <line x1="${centerColX}" y1="${topY - 6}" x2="${centerColX}" y2="${topY - 20}" stroke="#475569" stroke-width="1" />
+        <line x1="${centerColX + wT}" y1="${topY - 6}" x2="${centerColX + wT}" y2="${topY - 20}" stroke="#475569" stroke-width="1" />
+        <line x1="${centerColX}" y1="${topY - 14}" x2="${centerColX + wT}" y2="${topY - 14}" stroke="#475569" stroke-width="1.2" />
+        <text x="${centerColX + wT / 2}" y="${topY - 18}" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#334155">wT=${r.wT_cm.toFixed(1)}cm</text>
+
+        <!-- Cota Ancho wy (Superior Derecha) -->
+        <line x1="${rightX - wY}" y1="${topY - 6}" x2="${rightX - wY}" y2="${topY - 20}" stroke="#475569" stroke-width="1" />
+        <line x1="${rightX}" y1="${topY - 6}" x2="${rightX}" y2="${topY - 20}" stroke="#475569" stroke-width="1" />
+        <line x1="${rightX - wY}" y1="${topY - 14}" x2="${rightX}" y2="${topY - 14}" stroke="#475569" stroke-width="1.2" />
+        <text x="${rightX - wY / 2}" y="${topY - 18}" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#334155">wy=${r.wy_cm.toFixed(1)}cm</text>
+
+        <!-- Cota Vertical lT (Derecha exterior) -->
+        <line x1="${rightX + 8}" y1="${topY + yokeH / 2}" x2="${rightX + 26}" y2="${topY + yokeH / 2}" stroke="#475569" stroke-width="1" />
+        <line x1="${rightX + 8}" y1="${botY - yokeH / 2}" x2="${rightX + 26}" y2="${botY - yokeH / 2}" stroke="#475569" stroke-width="1" />
+        <line x1="${rightX + 20}" y1="${topY + yokeH / 2}" x2="${rightX + 20}" y2="${botY - yokeH / 2}" stroke="#475569" stroke-width="1.2" marker-start="url(#dimTick)" marker-end="url(#dimTick)" />
+        <text x="${rightX + 25}" y="${midY - 8}" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#334155" transform="rotate(90 ${rightX + 25},${midY - 8})">
+          lT=${r.lT_cm}cm
+        </text>
+
+        <!-- PIE DE PLANO CON DATOS DE SECCIÓN CENTRAL -->
+        <rect x="16" y="340" width="528" height="36" rx="6" fill="#0f172a" />
+        <text x="28" y="362" font-family="JetBrains Mono" font-size="10" fill="#e2e8f0">
+          Rama Central: AT = ${r.AT_cm2.toFixed(2)} cm² (${fmtSciPlain(r.AT, 2)} m²) | ℱ = N·I = ${r.FMM.toFixed(1)} A·v | BT = ${r.BT.toFixed(3)} T
+        </text>
+      `;
+    }
+
+    // =========================================================================
+    // RENDERIZADO SVG 2: CIRCUITO MAGNÉTICO EQUIVALENTE (RED DE RELUCTANCIAS)
+    // =========================================================================
+    function renderCircuitSVG(r) {
+      const svg = document.getElementById('svg-magnetic-circuit');
+
+      // Función auxiliar para dibujar símbolo de reluctancia (resistor zig-zag) horizontal o vertical
+      const drawReluctanceV = (x, yCenter, label, valueStr, color = '#1e293b') => {
+        const h = 44;
+        const y0 = yCenter - h / 2;
+        const pts = [
+          `${x},${y0}`,
+          `${x},${y0 + 6}`,
+          `${x - 8},${y0 + 11}`,
+          `${x + 8},${y0 + 17}`,
+          `${x - 8},${y0 + 23}`,
+          `${x + 8},${y0 + 29}`,
+          `${x - 8},${y0 + 35}`,
+          `${x},${y0 + 39}`,
+          `${x},${y0 + h}`
+        ].join(' ');
+        return `
+          <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" />
+          <text x="${x + 13}" y="${yCenter - 3}" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="${color}">${label}</text>
+          <text x="${x + 13}" y="${yCenter + 10}" font-family="JetBrains Mono" font-size="8.5" fill="#475569">${valueStr}</text>
+        `;
+      };
+
+      const drawReluctanceH = (xCenter, y, label, valueStr, color = '#1e293b') => {
+        const w = 44;
+        const x0 = xCenter - w / 2;
+        const pts = [
+          `${x0},${y}`,
+          `${x0 + 6},${y}`,
+          `${x0 + 11},${y - 8}`,
+          `${x0 + 17},${y + 8}`,
+          `${x0 + 23},${y - 8}`,
+          `${x0 + 29},${y + 8}`,
+          `${x0 + 35},${y - 8}`,
+          `${x0 + 39},${y}`,
+          `${x0 + w},${y}`
+        ].join(' ');
+        return `
+          <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" />
+          <text x="${xCenter}" y="${y - 13}" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="${color}">${label}</text>
+          <text x="${xCenter}" y="${y + 19}" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#475569">${valueStr}</text>
+        `;
+      };
+
+      svg.innerHTML = `
+        <defs>
+          <marker id="cArrowSky" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#0284c7" />
+          </marker>
+          <marker id="cArrowGreen" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#059669" />
+          </marker>
+          <marker id="cArrowAmber" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#d97706" />
+          </marker>
+        </defs>
+
+        <text x="14" y="22" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#0f172a">
+          RED EQUIVALENTE: ℛT = ℛT,eq + (ℛx,eq || ℛy,eq)
+        </text>
+
+        <!-- CONDUCTORES DEL CIRCUITO MAGNÉTICO -->
+        <!-- Rama Fuente + Reluctancia Central hacia Nodo A -->
+        <line x1="65" y1="295" x2="65" y2="215" stroke="#334155" stroke-width="2" />
+        <line x1="65" y1="165" x2="65" y2="75" stroke="#334155" stroke-width="2" />
+        <line x1="65" y1="75" x2="108" y2="75" stroke="#334155" stroke-width="2" />
+        <line x1="152" y1="75" x2="215" y2="75" stroke="#334155" stroke-width="2" />
+
+        <!-- Barra Superior Paralelo (Nodo A) -->
+        <line x1="215" y1="75" x2="325" y2="75" stroke="#334155" stroke-width="2" />
+
+        <!-- Rama Vertical X (Izquierda del paralelo) -->
+        <line x1="215" y1="75" x2="215" y2="128" stroke="#334155" stroke-width="2" />
+        <line x1="215" y1="172" x2="215" y2="295" stroke="#334155" stroke-width="2" />
+
+        <!-- Rama Vertical Y (Derecha del paralelo) -->
+        <line x1="325" y1="75" x2="325" y2="128" stroke="#334155" stroke-width="2" />
+        <line x1="325" y1="172" x2="325" y2="295" stroke="#334155" stroke-width="2" />
+
+        <!-- Barra Inferior de Retorno (Nodo B) -->
+        <line x1="65" y1="295" x2="325" y2="295" stroke="#334155" stroke-width="2" />
+
+        <!-- FUENTE DE FUERZA MAGNETOMOTRIZ ℱ = N·I -->
+        <circle cx="65" cy="190" r="24" fill="#fffbeb" stroke="#d97706" stroke-width="2.4" />
+        <text x="65" y="180" text-anchor="middle" font-family="JetBrains Mono" font-size="13" font-weight="700" fill="#b45309">+</text>
+        <text x="65" y="207" text-anchor="middle" font-family="JetBrains Mono" font-size="13" font-weight="700" fill="#b45309">−</text>
+        <text x="33" y="186" text-anchor="end" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#0f172a">ℱ=N·I</text>
+        <text x="33" y="199" text-anchor="end" font-family="JetBrains Mono" font-size="9" fill="#b45309">${r.FMM.toFixed(0)} A·v</text>
+
+        <!-- RELUCTANCIAS EQUIVALENTES -->
+        ${drawReluctanceH(130, 75, 'ℛT,eq', fmtSciPlain(r.Req_T, 2), '#0369a1')}
+        ${drawReluctanceV(215, 150, 'ℛx,eq', fmtSciPlain(r.Req_x, 2), '#047857')}
+        ${drawReluctanceV(325, 150, 'ℛy,eq', fmtSciPlain(r.Req_y, 2), '#b45309')}
+
+        <!-- NODOS A Y B -->
+        <circle cx="215" cy="75" r="4" fill="#0f172a" />
+        <text x="215" y="64" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#0f172a">Nodo A</text>
+        <circle cx="215" cy="295" r="4" fill="#0f172a" />
+        <text x="215" y="310" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#0f172a">Nodo B</text>
+
+        <!-- FLECHAS DE FLUJO (ANÁLOGAS A CORRIENTES ELÉCTRICAS) -->
+        <!-- Flujo Total ΦT -->
+        <line x1="65" y1="130" x2="65" y2="95" stroke="#0284c7" stroke-width="2.5" marker-end="url(#cArrowSky)" />
+        <text x="75" y="116" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#0284c7">ΦT=${r.phi_T_mWb.toFixed(2)}mWb</text>
+
+        <!-- Flujo Φx -->
+        <line x1="215" y1="210" x2="215" y2="250" stroke="#059669" stroke-width="2.5" marker-end="url(#cArrowGreen)" />
+        <text x="206" y="235" text-anchor="end" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#059669">Φx=${r.phi_x_mWb.toFixed(2)}mWb</text>
+
+        <!-- Flujo Φy -->
+        <line x1="325" y1="210" x2="325" y2="250" stroke="#d97706" stroke-width="2.5" marker-end="url(#cArrowAmber)" />
+        <text x="334" y="235" text-anchor="start" font-family="JetBrains Mono" font-size="9.5" font-weight="700" fill="#d97706">Φy=${r.phi_y_mWb.toFixed(2)}mWb</text>
+
+        <!-- PIE DE CIRCUITO CON RELUCTANCIA TOTAL -->
+        <rect x="14" y="340" width="392" height="36" rx="6" fill="#0f172a" />
+        <text x="210" y="362" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#e2e8f0">
+          ℛTotal = ${fmtSciPlain(r.RT, 3)} A·v/Wb  |  ℱab = ${r.F_ab.toFixed(2)} A·v
+        </text>
+      `;
+    }
+
+    // =========================================================================
+    // EXPORTACIÓN FORMAL A PDF / IMPRESIÓN UNIVERSITARIA
+    // =========================================================================
+    function exportToPDF() {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('es-MX', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      document.getElementById('print-date').textContent = `Generado: ${dateStr}`;
+      window.print();
+    }
+
+    // Inicialización al cargar la ventana
+    window.addEventListener('DOMContentLoaded', () => {
+      calculateAll(false);
+    });
+  </script>
+</body>
+</html>
